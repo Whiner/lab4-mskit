@@ -1,25 +1,6 @@
 package org.donntu.knt.mskit.lab4;
 
-import java.security.MessageDigest;
-
-/**
- * Implements the MD4 message digest algorithm in Java.
- * <p>
- * <b>References:</b>
- * <ol>
- * <li> Ronald L. Rivest,
- * "<a href="http://www.roxen.com/rfc/rfc1320.html">
- * The MD4 Message-Digest Algorithm</a>",
- * IETF RFC-1320 (informational).
- * </ol>
- *
- * <p><b>$Revision: 1.2 $</b>
- *
- * @author Raif S. Naffah
- */
-public class MD4 extends MessageDigest implements Cloneable {
-// MD4 specific object variables
-//...........................................................................
+public class MD4 {
 
     /**
      * The size in bytes of the input block to the tranformation algorithm.
@@ -47,44 +28,18 @@ public class MD4 extends MessageDigest implements Cloneable {
     private int[] X = new int[16];
 
 
-// Constructors
-//...........................................................................
-
-    public MD4() {
-        super("MD4");
+    public String hashCode(String string) {
         engineReset();
+        engineUpdate(string.getBytes());
+        byte[] bytes = engineDigest();
+        StringBuilder builder = new StringBuilder();
+        for (byte b : bytes) {
+            builder.append((char)b);
+        }
+        return builder.toString();
     }
 
-    /**
-     * This constructor is here to implement cloneability of this class.
-     */
-    private MD4(MD4 md) {
-        this();
-        context = md.context.clone();
-        buffer = md.buffer.clone();
-        count = md.count;
-    }
-
-
-// Cloneable method implementation
-//...........................................................................
-
-    /**
-     * Returns a copy of this MD object.
-     */
-    public Object clone() {
-        return new MD4(this);
-    }
-
-
-// JCE methods
-//...........................................................................
-
-    /**
-     * Resets this object disregarding any temporary data present at the
-     * time of the invocation of this call.
-     */
-    public void engineReset() {
+    private void engineReset() {
         // initial values of MD4 i.e. A, B, C, D
         // as per rfc-1320; they are low-order byte first
         context[0] = 0x67452301;
@@ -92,67 +47,35 @@ public class MD4 extends MessageDigest implements Cloneable {
         context[2] = 0x98BADCFE;
         context[3] = 0x10325476;
         count = 0L;
-        for (int i = 0; i < BLOCK_LENGTH; i++)
+        for (int i = 0; i < BLOCK_LENGTH; i++) {
             buffer[i] = 0;
+        }
     }
 
-    /**
-     * Continues an MD4 message digest using the input byte.
-     */
-    public void engineUpdate(byte b) {
-        // compute number of bytes still unhashed; ie. present in buffer
-        int i = (int) (count % BLOCK_LENGTH);
-        count++;                                        // update number of bytes
-        buffer[i] = b;
-        if (i == BLOCK_LENGTH - 1)
-            transform(buffer, 0);
-    }
 
-    /**
-     * MD4 block update operation.
-     * <p>
-     * Continues an MD4 message digest operation, by filling the buffer,
-     * transform(ing) data in 512-bit message block(s), updating the variables
-     * context and count, and leaving (buffering) the remaining bytes in buffer
-     * for the next update or finish.
-     *
-     * @param input  input block
-     * @param offset start of meaningful bytes in input
-     * @param len    count of bytes in input block to consider
-     */
-    public void engineUpdate(byte[] input, int offset, int len) {
-        // make sure we don't exceed input's allocated size/length
-        if (offset < 0 || len < 0 || (long) offset + len > input.length)
-            throw new ArrayIndexOutOfBoundsException();
-
+    private void engineUpdate(byte[] input) {
         // compute number of bytes still unhashed; ie. present in buffer
         int bufferNdx = (int) (count % BLOCK_LENGTH);
-        count += len;                                        // update number of bytes
+        count += input.length;                                        // update number of bytes
         int partLen = BLOCK_LENGTH - bufferNdx;
         int i = 0;
-        if (len >= partLen) {
-            System.arraycopy(input, offset, buffer, bufferNdx, partLen);
-
+        if (input.length >= partLen) {
+            System.arraycopy(input, 0, buffer, bufferNdx, partLen);
 
             transform(buffer, 0);
 
-            for (i = partLen; i + BLOCK_LENGTH - 1 < len; i += BLOCK_LENGTH)
-                transform(input, offset + i);
+            for (i = partLen; i + BLOCK_LENGTH - 1 < input.length; i += BLOCK_LENGTH) {
+                transform(input, i);
+            }
             bufferNdx = 0;
         }
         // buffer remaining input
-        if (i < len)
-            System.arraycopy(input, offset + i, buffer, bufferNdx, len - i);
+        if (i < input.length) {
+            System.arraycopy(input, i, buffer, bufferNdx, input.length - i);
+        }
     }
 
-    /**
-     * Completes the hash computation by performing final operations such
-     * as padding. At the return of this engineDigest, the MD engine is
-     * reset.
-     *
-     * @return the array of bytes for the resulting hash value.
-     */
-    public byte[] engineDigest() {
+    private byte[] engineDigest() {
         // pad output to 56 mod 64; as RFC1320 puts it: congruent to 448 mod 512
         int bufferNdx = (int) (count % BLOCK_LENGTH);
         int padLen = (bufferNdx < 56) ? (56 - bufferNdx) : (120 - bufferNdx);
@@ -167,22 +90,19 @@ public class MD4 extends MessageDigest implements Cloneable {
         for (int i = 0; i < 8; i++)
             tail[padLen + i] = (byte) ((count * 8) >>> (8 * i));
 
-        engineUpdate(tail, 0, tail.length);
+        engineUpdate(tail);
 
         byte[] result = new byte[16];
         // cast this MD4's context (array of 4 ints) into an array of 16 bytes.
-        for (int i = 0; i < 4; i++)
-            for (int j = 0; j < 4; j++)
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
                 result[i * 4 + j] = (byte) (context[i] >>> (8 * j));
+            }
+        }
 
-        // reset the engine
-        engineReset();
         return result;
     }
 
-
-// own methods
-//...........................................................................
 
     /**
      * MD4 basic transformation.
