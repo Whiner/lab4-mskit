@@ -2,6 +2,15 @@ plugins {
     id 'java'
 }
 
+sourceSets {
+    main {
+        resources {
+            srcDirs = ["src/main/resources"]
+            includes = ["**/*.fxml"]
+        }
+    }
+}
+
 group 'org.donntu.knt.mskit'
 version '1.0-SNAPSHOT'
 
