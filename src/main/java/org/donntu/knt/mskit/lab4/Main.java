@@ -4,7 +4,7 @@ import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.canvas.Canvas;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 import java.io.IOException;
@@ -19,17 +19,15 @@ public class Main extends Application {
         return currentStage;
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         launch(args);
-        /*String inputFilename = "files/input.txt";
-        String compressedFilename = compress(inputFilename);
-        String decompressedFilename = decompress(compressedFilename);*/
     }
 
     @Override
     public void start(Stage primaryStage) throws Exception {
         currentStage = primaryStage;
         Parent root = FXMLLoader.load(getClass().getResource("/primary.fxml"));
+        primaryStage.getIcons().add(new Image(this.getClass().getResourceAsStream("/icon.png")));
         primaryStage.setScene(new Scene(root));
         primaryStage.setTitle("Лабораторная №4");
         primaryStage.setMaxWidth(800);

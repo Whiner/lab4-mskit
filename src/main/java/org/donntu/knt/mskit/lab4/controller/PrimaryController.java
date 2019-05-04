@@ -1,8 +1,11 @@
 package org.donntu.knt.mskit.lab4.controller;
 
 import com.sun.javafx.binding.StringFormatter;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.fxml.FXML;
 import javafx.scene.canvas.Canvas;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -35,9 +38,15 @@ public class PrimaryController {
     private Button randomizeSomeBytesButton;
 
     @FXML
+    private TextField changeBytesCount;
+
+    @FXML
     void initialize() {
         final Stage currentStage = Main.getCurrentStage();
         compressPercentLabel.setText("неизвестно");
+        changeBytesCount.setText("20");
+        randomizeSomeBytesButton.setDisable(true);
+        changeBytesCount.setDisable(true);
         fileDialogButton.setOnAction(event -> {
             String filename = service.openFileDialog(currentStage);
             if (filename != null) {
@@ -45,11 +54,28 @@ public class PrimaryController {
                 service.processFile();
                 service.fillIntegrityLine(canvasField);
                 service.fillCompressPercent(compressPercentLabel);
+                randomizeSomeBytesButton.setDisable(false);
+                changeBytesCount.setDisable(false);
             }
         });
         randomizeSomeBytesButton.setOnAction(event -> {
-            service.changeRandomBytesInDecompressedFile();
-            service.fillIntegrityLine(canvasField);
+            try {
+                int count = Integer.parseInt(changeBytesCount.getText());
+                service.changeRandomBytesInDecompressedFile(count);
+                service.fillIntegrityLine(canvasField);
+            } catch (Exception e) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Ошибка!");
+                alert.setHeaderText(null);
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        });
+
+        changeBytesCount.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.matches("\\d*")) {
+                changeBytesCount.setText(newValue.replaceAll("[^\\d]", ""));
+            }
         });
 
         canvasField = new Canvas(765, 45);

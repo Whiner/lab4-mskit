@@ -59,7 +59,8 @@ public class PrimaryService {
             double step = (width - BLOCKS_COUNT * separatorWidth) / fileIntegrity.size();
             double x = 0;
             GraphicsContext graphicsContext = canvas.getGraphicsContext2D();
-            for (Boolean isOk : fileIntegrity) {
+            for (int i = 0; i < fileIntegrity.size(); i++) {
+                final Boolean isOk = fileIntegrity.get(i);
                 if (isOk) {
                     graphicsContext.setFill(new Color(0.1, 0.7, 0.1, 1.0));
                 } else {
@@ -67,7 +68,9 @@ public class PrimaryService {
                 }
                 graphicsContext.fillRect(x, 0, step, height);
                 x += step;
-                graphicsContext.setFill(new Color(0.0, 0.0, 0.0, 1.0));
+                if(i < fileIntegrity.size() - 1) {
+                    graphicsContext.setFill(new Color(0.0, 0.0, 0.0, 1.0));
+                }
                 graphicsContext.fillRect(x, 0, separatorWidth, height);
                 x += separatorWidth;
             }
@@ -99,9 +102,13 @@ public class PrimaryService {
         return Collections.emptyList();
     }
 
-    public void changeRandomBytesInDecompressedFile() {
+    public void changeRandomBytesInDecompressedFile(int count) throws Exception {
         try (RandomAccessFile file = new RandomAccessFile(decompressedFilename, "rw")) {
-            int count = (int) (file.length() * 0.01);
+            if(count < 1 || count > file.length()) {
+                throw new Exception(
+                        "Некорректное количество заменяемых байт по отношению к размеру файла " +
+                                "(" + file.length() + ")");
+            }
             ThreadLocalRandom random = ThreadLocalRandom.current();
             for (int i = 0; i < count; i++) {
                 int position = random.nextInt((int) file.length());
