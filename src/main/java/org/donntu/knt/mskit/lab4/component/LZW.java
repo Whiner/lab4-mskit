@@ -5,7 +5,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class LZW {
-    public static final String COMPRESS_EXTENSION = ".lzw";
+    private static final String COMPRESS_EXTENSION = ".lzw";
+    private static final int MAX_DICTIONARY_SIZE = 4096;
+
 
     public static String compress(String input) throws IOException {
         String output = FileRenamer.getNameCompressedFile(input, COMPRESS_EXTENSION);
@@ -24,8 +26,7 @@ public class LZW {
             byte inputByte;
             StringBuilder temp = new StringBuilder();
 
-            byte[] buffer = new byte[3];
-            boolean onLeft = true;
+            StringBuilder bitTemp = new StringBuilder();
 
             inputByte = read.readByte();
             int i = new Byte(inputByte).intValue();
@@ -52,16 +53,14 @@ public class LZW {
                 if (table.containsKey(temp.toString() + c)) {
                     temp.append(c);
                 } else {
-                    String s12 = to12bit(table.get(temp.toString()));
+                    bitTemp.append(to12bit(table.get(temp.toString())));
 
-                    if (onLeft) {
-                        buffer[0] = (byte) Integer.parseInt(s12.substring(0, 8), 2);
-                        buffer[1] = (byte) Integer.parseInt(s12.substring(8, 12) + "0000", 2);
-                    } else {
-                        bufferWork(out, buffer, s12);
+                    while (bitTemp.length() >= 8) {
+                        out.writeByte((byte) Integer.parseInt(bitTemp.substring(0, 8), 2));
+                        bitTemp.delete(0, 8);
                     }
-                    onLeft = !onLeft;
-                    if (count < 4096) {
+
+                    if (count < MAX_DICTIONARY_SIZE) {
                         table.put(temp.append(c).toString(), count++);
                     }
                     temp = new StringBuilder(String.valueOf(c));
@@ -69,27 +68,17 @@ public class LZW {
             }
 
 
-            String temp12Bit = to12bit(table.get(temp.toString()));
-            if (onLeft) {
-                buffer[0] = (byte) Integer.parseInt(temp12Bit.substring(0, 8), 2);
-                buffer[1] = (byte) Integer.parseInt(temp12Bit.substring(8, 12) + "0000", 2);
-                out.writeByte(buffer[0]);
-                out.writeByte(buffer[1]);
-            } else {
-                bufferWork(out, buffer, temp12Bit);
+            bitTemp.append(to12bit(table.get(temp.toString())));
+            while (bitTemp.length() > 0) {
+                while (bitTemp.length() < 8) {
+                    bitTemp.append('0');
+                }
+                out.writeByte((byte) Integer.parseInt(bitTemp.substring(0, 8), 2));
+                bitTemp.delete(0, 8);
             }
 
         }
         return output;
-    }
-
-    private static void bufferWork(DataOutputStream out, byte[] buffer, String s12) throws IOException {
-        buffer[1] += (byte) Integer.parseInt(s12.substring(0, 4), 2);
-        buffer[2] = (byte) Integer.parseInt(s12.substring(4, 12), 2);
-        for (int b = 0; b < buffer.length; b++) {
-            out.writeByte(buffer[b]);
-            buffer[b] = 0;
-        }
     }
 
     private static String to12bit(int i) {
@@ -100,32 +89,8 @@ public class LZW {
         return temp.toString();
     }
 
-    private static int getValue(byte b1, byte b2, boolean onLeft) {
-        StringBuilder temp1 = new StringBuilder(Integer.toBinaryString(b1));
-        StringBuilder temp2 = new StringBuilder(Integer.toBinaryString(b2));
-        while (temp1.length() < 8) {
-            temp1.insert(0, "0");
-        }
-        if (temp1.length() == 32) {
-            temp1 = new StringBuilder(temp1.substring(24, 32));
-        }
-        while (temp2.length() < 8) {
-            temp2.insert(0, "0");
-        }
-        if (temp2.length() == 32) {
-            temp2 = new StringBuilder(temp2.substring(24, 32));
-        }
-
-        if (onLeft) {
-            return Integer.parseInt(temp1 + temp2.substring(0, 4), 2);
-        } else {
-            return Integer.parseInt(temp1.substring(4, 8) + temp2, 2);
-        }
-
-    }
-
     public static String decompress(String input) throws IOException {
-        int charArraySize = 4096;
+        int charArraySize = MAX_DICTIONARY_SIZE;
         String[] charArray = new String[charArraySize];
         for (int i = 0; i < 256; i++) {
             charArray[i] = Character.toString((char) i);
@@ -140,30 +105,30 @@ public class LZW {
         ) {
 
             int currentWord, priorityWord;
-            byte[] buffer = new byte[3];
-            boolean onLeft;
+            StringBuilder bitTemp = new StringBuilder();
+            readNext(bitTemp, in);
+            readNext(bitTemp, in);
 
-            buffer[0] = in.readByte();
-            buffer[1] = in.readByte();
+            priorityWord = getValue(bitTemp);
 
-            priorityWord = getValue(buffer[0], buffer[1], true);
-            onLeft = false;
             out.writeBytes(charArray[priorityWord]);
 
-            while (true) {
+            boolean isNotEnd = true;
+
+            while (isNotEnd) {
                 try {
-                    if (onLeft) {
-                        buffer[0] = in.readByte();
-                        buffer[1] = in.readByte();
-                        currentWord = getValue(buffer[0], buffer[1], true);
-                    } else {
-                        buffer[2] = in.readByte();
-                        currentWord = getValue(buffer[1], buffer[2], false);
+                    while (bitTemp.length() < 12) {
+                        readNext(bitTemp, in);
                     }
                 } catch (EOFException e) {
-                    break;
+                    isNotEnd = false;
                 }
-                onLeft = !onLeft;
+                if(bitTemp.length() < 12) {
+                    break;
+                } else {
+                    currentWord = getValue(bitTemp);
+                }
+
                 if (currentWord >= count) {
                     String s = charArray[priorityWord] + charArray[priorityWord].charAt(0);
                     if (count < charArraySize) {
@@ -183,5 +148,15 @@ public class LZW {
 
         }
         return output;
+    }
+
+    private static int getValue(StringBuilder bitTemp) {
+        int i = Integer.parseInt(bitTemp.substring(0, 12), 2);
+        bitTemp.delete(0, 12);
+        return i;
+    }
+
+    private static void readNext(StringBuilder bitTemp, DataInputStream in) throws IOException {
+        bitTemp.append(ByteUtils.byteToBits(in.readByte(), 8));
     }
 }
